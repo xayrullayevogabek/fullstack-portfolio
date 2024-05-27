@@ -3,6 +3,7 @@ import AdminJSExpress from "@adminjs/express";
 import User from "./models/User.model.js";
 import express from "express";
 import mongoose from "mongoose";
+import { create } from "express-handlebars";
 import * as AdminJSMongoose from "@adminjs/mongoose";
 import * as dotenv from "dotenv";
 import Resume from "./models/Resume.model.js";
@@ -10,9 +11,27 @@ import Skills from "./models/Skills.model.js";
 import Project from "./models/Project.model.js";
 import Comment from "./models/Comment.model.js";
 import Blog from "./models/Blog.model.js";
+import pagesRouteMiddleware from "./routes/route.js";
 
 dotenv.config();
-const PORT = 3000;
+
+const PORT = process.env.PORT || 3000;
+const app = express();
+
+app.use(express.static("public"));
+
+const hbs = create({
+  defaultLayout: "main",
+  extname: "hbs",
+});
+
+app.use(express.urlencoded({ extended: true }));
+app.engine("hbs", hbs.engine);
+app.set("view engine", "hbs");
+app.set("views", "./views");
+
+// Routes
+app.use(pagesRouteMiddleware);
 
 const DEFAULT_ADMIN = {
   email: process.env.ADMIN_EMAIL,
@@ -32,95 +51,82 @@ AdminJS.registerAdapter({
 });
 
 const start = async () => {
-  const app = express();
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+    console.log("MongoDB connected");
 
-  const mongooseDB = await mongoose
-    .connect(process.env.MONGODB_URI)
-    .then(() => console.log("MongoDb connected"))
-    .catch((error) => console.log(error));
+    const adminOptions = {
+      resources: [
+        {
+          resource: User,
+          options: {
+            navigation: { name: "User", icon: "User" },
+          },
+        },
+        {
+          resource: Resume,
+          options: {
+            navigation: { name: "Resume", icon: "FileText" },
+          },
+        },
+        {
+          resource: Skills,
+          options: {
+            navigation: { name: "Skills", icon: "BarChart" },
+          },
+        },
+        {
+          resource: Project,
+          options: {
+            navigation: { name: "Project", icon: "Folder" },
+          },
+        },
+        {
+          resource: Blog,
+          options: {
+            navigation: { name: "Blogs", icon: "FileText" },
+          },
+        },
+        {
+          resource: Comment,
+          options: {
+            navigation: { name: "Comment", icon: "MessageSquare" },
+          },
+        },
+      ],
+    };
 
-  const adminOptions = {
-    // We pass Category to `resources`
-    resources: [
-      {
-        resource: User,
-        options: {
-          navigation: { name: "User", icon: "User" },
-        },
-      },
-      {
-        resource: Resume,
-        options: {
-          navigation: { name: "Resume", icon: "FileText" },
-        },
-      },
-      {
-        resource: Skills,
-        options: {
-          navigation: { name: "Skills", icon: "BarChart" },
-        },
-      },
-      {
-        resource: Project,
-        options: {
-          navigation: { name: "Project", icon: "Folder" },
-          // properties: {
-          //   postContent: {
-          //     type: "richtext",
-          //   },
-          // },
-        },
-      },
-      {
-        resource: Blog,
-        options: {
-          navigation: { name: "Blogs", icon: "Folder" },
-          // properties: {
-          //   postContent: {
-          //     type: "richtext",
-          //   },
-          // },
-        },
-      },
-      {
-        resource: Comment,
-        options: {
-          navigation: { name: "Comment", icon: "Folder" },
-          // properties: {
-          //   postContent: {
-          //     type: "richtext",
-          //   },
-          // },
-        },
-      },
-    ],
-  };
+    const admin = new AdminJS(adminOptions);
 
-  const admin = new AdminJS(adminOptions);
-
-  const adminRouter = AdminJSExpress.buildAuthenticatedRouter(
-    admin,
-    {
-      authenticate,
-      cookieName: "AdminJS",
-      cookiePassword: "Secret",
-    },
-    null,
-    {
-      store: mongooseDB,
-      resave: true,
-      saveUninitialized: true,
-      secret: "Secret",
-      name: "adminjs",
-    }
-  );
-  app.use(admin.options.rootPath, adminRouter);
-
-  app.listen(PORT, () => {
-    console.log(
-      `AdminJS started on http://localhost:${PORT}${admin.options.rootPath}`
+    const adminRouter = AdminJSExpress.buildAuthenticatedRouter(
+      admin,
+      {
+        authenticate,
+        cookieName: "AdminJS",
+        cookiePassword: "Secret",
+      },
+      null,
+      {
+        resave: true,
+        saveUninitialized: true,
+        secret: "Secret",
+        name: "adminjs",
+      }
     );
-  });
+
+    app.use(admin.options.rootPath, adminRouter);
+
+    app.listen(PORT, () => {
+      console.log(
+        `AdminJS started on http://localhost:${PORT}${admin.options.rootPath}`
+      );
+    });
+  } catch (error) {
+    console.error("Failed to start the server:", error);
+  }
 };
 
 start();
