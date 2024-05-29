@@ -12,6 +12,7 @@ import Project from "./models/Project.model.js";
 import Comment from "./models/Comment.model.js";
 import Blog from "./models/Blog.model.js";
 import pagesRouteMiddleware from "./routes/route.js";
+import hbsHelpers from "./utils/index.js";
 
 dotenv.config();
 
@@ -23,9 +24,9 @@ app.use(express.static("public"));
 const hbs = create({
   defaultLayout: "main",
   extname: "hbs",
+  helpers: hbsHelpers,
 });
 
-app.use(express.urlencoded({ extended: true }));
 app.engine("hbs", hbs.engine);
 app.set("view engine", "hbs");
 app.set("views", "./views");
@@ -110,7 +111,7 @@ const start = async () => {
       },
       null,
       {
-        resave: true,
+        resave: false,
         saveUninitialized: true,
         secret: "Secret",
         name: "adminjs",
@@ -118,6 +119,8 @@ const start = async () => {
     );
 
     app.use(admin.options.rootPath, adminRouter);
+    app.use(express.json());
+    app.use(express.urlencoded({ extended: true }));
 
     app.listen(PORT, () => {
       console.log(
